@@ -38,11 +38,18 @@
             align-items: center;
         }
 
-        .logo img {
-            max-height: 120px;
-            width: auto;
-            border-radius: 10px;
-            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.1);
+        .logo-placeholder {
+            height: 120px;
+            width: 120px;
+            background: #8B0000;
+            border-radius: 50%;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: white;
+            font-weight: bold;
+            font-size: 1.5rem;
+            box-shadow: 0 5px 15px rgba(0, 0, 0, 0.2);
         }
 
         h1 {
@@ -155,7 +162,7 @@
             box-shadow: none;
         }
 
-        .member-info {
+        .student-info {
             background: #f8f9ff;
             border: 1px solid #e1e1e1;
             border-radius: 10px;
@@ -164,7 +171,7 @@
             display: none;
         }
 
-        .member-info h3 {
+        .student-info h3 {
             color: #8B0000;
             margin-bottom: 10px;
             font-size: 1.3em;
@@ -199,7 +206,7 @@
 <body>
     <div class="container">
         <div class="logo">
-            <img src="logoMK.png" alt="Logo" id="logoImg" style="display: none;">
+            <div class="logo-placeholder">SCHOOL</div>
         </div>
         
         <h1>Students-Check-In</h1>
@@ -212,7 +219,7 @@
         <div class="student-info" id="studentInfo">
             <h3>Please confirm this is you:</h3>
             <div class="person-details" id="personDetails"></div>
-            <button class="btn-confirm" onclick="confirmCheckIn()">Yes, Check Me In</button>
+            <button class="btn-confirm" id="confirmBtn">Yes, Check Me In</button>
             <button class="btn-cancel" onclick="clearSelection()">This is not me</button>
         </div>
         
@@ -230,26 +237,25 @@
         // ================================
         // 1. Upload your Excel file to this directory
         // 2. Change the filename below to match your Excel file name
-        const EXCEL_FILENAME = 'All students list 2025.xlsx'; // <-- CHANGE THIS TO YOUR EXCEL FILE NAME
+        const EXCEL_FILENAME = 'Students list 2025.xlsx'; // <-- CHANGE THIS TO YOUR EXCEL FILE NAME
         
         // 3. Configure your Excel column names below (case-sensitive)
         // If your Excel has different column names, update these:
         const COLUMN_MAPPING = {
-            StudentId: 'Member ID',        // Column name for Student ID
-            firstName: 'First Name',      // Column name for First Name
-            middleName: 'Middle Name',    // Column name for Middle Name (optional)
-            lastName: 'Last name',        // Column name for Last Name (note: lowercase 'n')
-            Bible: 'Grade',              // Column name for Bible (note: hyphen)
-            Amharic: 'Level'         // Column name for Amharic (optional)
+            studentId: 'Student ID',        // Column name for Student ID
+            firstName: 'First Name',       // Column name for First Name
+            middleName: 'Middle Name',     // Column name for Middle Name (optional)
+            lastName: 'Last name',         // Column name for Last Name                 // Column name for Grade
+            bible: 'Bible Level',          // Column name for Bible Level
+            level: 'Level',                // Column name for Level
+            amharic: 'Amharic Level'       // Column name for Amharic Level
         };
         
         // ================================
-        // DATA LOADING (DO NOT MODIFY BELOW)
+        // DATA LOADING
         // ================================
         let members = [];
         
-        // Data will be loaded from Excel file
-
         // Function to load Excel file
         async function loadExcelData() {
             try {
@@ -272,12 +278,12 @@
                 
                 // Map Excel columns to our format
                 members = jsonData.map((row, index) => ({
-                    memberId: row[COLUMN_MAPPING.memberId] || `auto_${index}`,
+                    studentId: row[COLUMN_MAPPING.studentId] || `auto_${index}`,
                     firstName: row[COLUMN_MAPPING.firstName] || '',
                     middleName: row[COLUMN_MAPPING.middleName] || '',
                     lastName: row[COLUMN_MAPPING.lastName] || '',
-                    bible: row[COLUMN_MAPPING.biblegrade] || '',
-                    amharic: row[COLUMN_MAPPING.amhariclevel] || '',
+                    grade: row[COLUMN_MAPPING.bible] || '',
+                    level: row[COLUMN_MAPPING.amharic] || '',
                     uniqueId: `member_${index}` // Add unique ID for reliable selection
                 })).filter(member => member.firstName && member.lastName); // Remove empty rows
                 
@@ -286,15 +292,47 @@
                 
             } catch (error) {
                 console.warn('Could not load Excel file:', error.message);
-                console.log('No Excel file found. Please upload members.xlsx');
-                members = [];
+                console.log('Using sample data instead');
+                
+                // Sample data as fallback
+                members = [
+                    {
+                        studentId: 'STU001',
+                        firstName: 'John',
+                        middleName: 'Michael',
+                        lastName: 'Doe',
+                        grade: '10',
+                        level: 'A',
+                        uniqueId: 'member_0'
+                    },
+                    {
+                        studentId: 'STU002',
+                        firstName: 'Jane',
+                        middleName: 'Elizabeth',
+                        lastName: 'Smith',
+                        grade: '11',
+                        level: 'B',
+                        uniqueId: 'member_1'
+                    },
+                    {
+                        studentId: 'STU003',
+                        firstName: 'Robert',
+                        middleName: 'James',
+                        lastName: 'Johnson',
+                        grade: '9',
+                        level: 'C',
+                        uniqueId: 'member_2'
+                    }
+                ];
             }
         }
 
         const searchInput = document.getElementById('nameSearch');
         const suggestions = document.getElementById('suggestions');
-        const memberInfo = document.getElementById('memberInfo');
+        const studentInfo = document.getElementById('studentInfo');
+        const personDetails = document.getElementById('personDetails');
         const successMessage = document.getElementById('successMessage');
+        const confirmBtn = document.getElementById('confirmBtn');
         
         let selectedMember = null;
         let checkedInMembers = new Set(); // Track who has checked in
@@ -305,30 +343,27 @@
             if (query.length < 2) {
                 suggestions.style.display = 'none';
                 searchInput.classList.remove('dropdown-open');
-                memberInfo.style.display = 'none';
+                studentInfo.style.display = 'none';
                 return;
             }
 
             const matches = members.filter(member => {
                 const fullName = `${member.firstName} ${member.middleName ? member.middleName + ' ' : ''}${member.lastName}`.toLowerCase();
                 const reverseName = `${member.lastName} ${member.firstName}`.toLowerCase();
-                const phone = member.bible || '';
                 
                 return fullName.includes(query) || 
                        reverseName.includes(query) ||
                        member.firstName.toLowerCase().includes(query) ||
                        member.lastName.toLowerCase().includes(query) ||
-                       (member.middleName && member.middleName.toLowerCase().includes(query)) ||
-                       phone.includes(query);
+                       (member.middleName && member.middleName.toLowerCase().includes(query));
             });
 
             if (matches.length > 0) {
                 suggestions.innerHTML = matches.map(member => {
                     const displayName = `${member.firstName} ${member.middleName ? member.middleName + ' ' : ''}${member.lastName}`;
-                    const displayPhone = member.phone ? member.phone : 'N/A';
                     return `<div class="suggestion-item" onclick="selectMember('${member.uniqueId}')">
                                 <strong>${displayName}</strong><br>
-                                <small>${displayPhone}</small>
+                                <small>ID: ${member.studentId} | Grade: ${member.bible}</small>
                             </div>`;
                 }).join('');
                 
@@ -343,41 +378,35 @@
         });
 
         function selectMember(uniqueId) {
-            console.log('Selecting member with uniqueId:', uniqueId);
             selectedMember = members.find(m => m.uniqueId === uniqueId);
-            console.log('Found member:', selectedMember);
             if (selectedMember) {
                 const displayName = `${selectedMember.firstName} ${selectedMember.middleName ? selectedMember.middleName + ' ' : ''}${selectedMember.lastName}`;
                 searchInput.value = displayName;
                 suggestions.style.display = 'none';
                 searchInput.classList.remove('dropdown-open');
-                showMemberInfo();
+                showStudentInfo();
             }
         }
 
-        function showMemberInfo() {
+        function showStudentInfo() {
             if (!selectedMember) return;
             
-            const alreadyCheckedIn = isAlreadyCheckedIn(selectedMember.memberId);
+            const alreadyCheckedIn = isAlreadyCheckedIn(selectedMember.studentId);
             const statusText = alreadyCheckedIn ? 
                 '<p style="color: #28a745; font-weight: bold;">✅ Already Checked In</p>' : 
                 '<p style="color: #ffc107; font-weight: bold;">⏳ Not Checked In</p>';
             
             const displayName = `${selectedMember.firstName} ${selectedMember.middleName ? selectedMember.middleName + ' ' : ''}${selectedMember.lastName}`;
-            const displayEmail = selectedMember.bible || 'N/A';
-            const displayPhone = selectedMember.amhariclevel || 'N/A';
             
-            const personDetails = document.getElementById('personDetails');
             personDetails.innerHTML = `
                 <p><strong>Student ID:</strong> ${selectedMember.studentId || 'N/A'}</p>
                 <p><strong>Name:</strong> ${displayName}</p>
-                <p><strong>Email:</strong> ${displayBible}</p>
-                <p><strong>Phone:</strong> ${displayAmharic-Level}</p>
+                <p><strong>Grade:</strong> ${selectedMember.bible || 'N/A'}</p>
+                <p><strong>Level:</strong> ${selectedMember.amharic || 'N/A'}</p>
                 ${statusText}
             `;
             
             // Update button states
-            const confirmBtn = document.querySelector('.btn-confirm');
             if (alreadyCheckedIn) {
                 confirmBtn.disabled = true;
                 confirmBtn.textContent = 'Already Checked In';
@@ -388,62 +417,48 @@
                 confirmBtn.style.opacity = '1';
             }
             
-            memberInfo.style.display = 'block';
+            studentInfo.style.display = 'block';
         }
 
-        async function confirmCheckIn() {
+        function confirmCheckIn() {
             if (!selectedMember) return;
             
-            try {
-                const fullName = `${selectedMember.firstName} ${selectedMember.middleName ? selectedMember.middleName + ' ' : ''}${selectedMember.lastName}`;
-                const checkInData = {
-                    memberId: selectedMember.memberId,
-                    name: fullName,
-                    email: selectedMember.email || 'N/A',
-                    phone: selectedMember.phone || 'N/A',
-                    timestamp: window.firebaseEnabled ? window.firebaseServerTimestamp() : new Date().toISOString(),
-                    date: new Date().toLocaleDateString(),
-                    time: new Date().toLocaleTimeString()
-                };
-                
-                if (window.firebaseEnabled) {
-                    // Save to Firebase for real-time syncing
-                    const checkInsRef = window.firebaseRef(window.database, 'checkIns');
-                    await window.firebasePush(checkInsRef, checkInData);
-                    console.log('Check-in saved to Firebase:', checkInData);
-                } else {
-                    // Save locally if Firebase not available
-                    let localCheckIns = JSON.parse(localStorage.getItem('checkIns') || '[]');
-                    localCheckIns.push(checkInData);
-                    localStorage.setItem('checkIns', JSON.stringify(localCheckIns));
-                    console.log('Check-in saved locally:', checkInData);
-                }
-                
-                // Add to local tracking for immediate UI updates
-                checkedInMembers.add(selectedMember.memberId);
-                
-                memberInfo.style.display = 'none';
-                successMessage.style.display = 'block';
-                
-                // Reset form after 3 seconds
-                setTimeout(() => {
-                    clearForm();
-                }, 3000);
-                
-            } catch (error) {
-                console.error('Error saving check-in:', error);
-                alert('Error saving check-in. Please try again.');
-            }
+            const fullName = `${selectedMember.firstName} ${selectedMember.middleName ? selectedMember.middleName + ' ' : ''}${selectedMember.lastName}`;
+            const checkInData = {
+                studentId: selectedMember.studentId,
+                name: fullName,
+                grade: selectedMember.bible || 'N/A',
+                level: selectedMember.amharic || 'N/A',
+                timestamp: new Date().toISOString(),
+                date: new Date().toLocaleDateString(),
+                time: new Date().toLocaleTimeString()
+            };
+            
+            // Save locally
+            let localCheckIns = JSON.parse(localStorage.getItem('studentCheckIns') || '[]');
+            localCheckIns.push(checkInData);
+            localStorage.setItem('studentCheckIns', JSON.stringify(localCheckIns));
+            
+            // Add to local tracking for immediate UI updates
+            checkedInMembers.add(selectedMember.studentId);
+            
+            studentInfo.style.display = 'none';
+            successMessage.style.display = 'block';
+            
+            // Reset form after 3 seconds
+            setTimeout(() => {
+                clearForm();
+            }, 3000);
         }
 
         function clearSelection() {
-            memberInfo.style.display = 'none';
+            studentInfo.style.display = 'none';
             selectedMember = null;
         }
 
         function clearForm() {
             searchInput.value = '';
-            memberInfo.style.display = 'none';
+            studentInfo.style.display = 'none';
             successMessage.style.display = 'none';
             suggestions.style.display = 'none';
             searchInput.classList.remove('dropdown-open');
@@ -465,56 +480,31 @@
             }
         });
 
-        // Load existing check-ins from Firebase or localStorage
+        // Load existing check-ins from localStorage
         function loadExistingCheckIns() {
-            if (window.firebaseEnabled) {
-                // Listen for real-time updates from Firebase
-                const checkInsRef = window.firebaseRef(window.database, 'checkIns');
-                window.firebaseOnValue(checkInsRef, (snapshot) => {
-                    const data = snapshot.val();
-                    checkedInMembers.clear();
-                    
-                    if (data) {
-                        Object.values(data).forEach(checkIn => {
-                            checkedInMembers.add(checkIn.memberId);
-                        });
-                        console.log(`Loaded ${checkedInMembers.size} check-ins from Firebase`);
-                    }
-                });
-            } else {
-                // Load from localStorage if Firebase not available
-                const localCheckIns = JSON.parse(localStorage.getItem('checkIns') || '[]');
-                checkedInMembers.clear();
-                localCheckIns.forEach(checkIn => {
-                    checkedInMembers.add(checkIn.memberId);
-                });
-                console.log(`Loaded ${checkedInMembers.size} check-ins from localStorage`);
-            }
+            const localCheckIns = JSON.parse(localStorage.getItem('studentCheckIns') || '[]');
+            checkedInMembers.clear();
+            localCheckIns.forEach(checkIn => {
+                checkedInMembers.add(checkIn.studentId);
+            });
+            console.log(`Loaded ${checkedInMembers.size} check-ins from localStorage`);
         }
 
-        // Check if member is already checked in
-        function isAlreadyCheckedIn(memberId) {
-            return checkedInMembers.has(memberId);
+        // Check if student is already checked in
+        function isAlreadyCheckedIn(studentId) {
+            return checkedInMembers.has(studentId);
         }
 
         // Initialize the application
         async function initializeApp() {
-            // Load logo
-            const logoImg = document.getElementById('logoImg');
-            const img = new Image();
-            img.onload = function() {
-                logoImg.style.display = 'block';
-            };
-            img.onerror = function() {
-                logoImg.style.display = 'none';
-            };
-            img.src = 'atlabologo.png';
-
             // Load Excel data
             await loadExcelData();
             
             // Load existing check-ins
             loadExistingCheckIns();
+            
+            // Set up event listener for confirm button
+            confirmBtn.addEventListener('click', confirmCheckIn);
             
             console.log('Application initialized successfully');
         }
